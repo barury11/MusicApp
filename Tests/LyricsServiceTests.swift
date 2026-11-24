@@ -1,5 +1,4 @@
 import XCTest
-@testable import MusicApp
 
 private final class LyricsStub: URLProtocol {
     static var responseCode = 200

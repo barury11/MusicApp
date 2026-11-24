@@ -11,4 +11,6 @@ Po pobraniu IPA i podpisaniu:
 7. Przełącz tryb samolotowy przy wcześniej pobranym albumie i otwórz filtr Pobrane. Test zależy od systemowego pobrania utworów i licencji Apple Music.
 8. Sprawdź jasny/ciemny wygląd, większy rozmiar tekstu, VoiceOver i Reduce Motion.
 
-Testy jednostkowe w Actions obejmują trwałość personalizacji, izolację albumów, reset bez utraty tekstu, brak nadpisania stanu po błędzie zapisu, walidację obrazu oraz przetwarzanie odpowiedzi tekstów. Nie zastępują testu konta Apple Music na urządzeniu.
+Testy jednostkowe w Actions obejmują trwałość personalizacji, izolację albumów, reset bez utraty tekstu, brak nadpisania stanu po błędzie zapisu, walidację obrazu, przetwarzanie odpowiedzi tekstów, poprawne kodowanie metadanych, cache oraz odpowiedzi HTTP 404 i 429. Nie zastępują testu konta Apple Music na urządzeniu.
+
+Testy kompilują bezpośrednio te same pliki produkcyjne modeli, zapisu i klienta LRCLIB w osobnym bundle testowym. Nie uruchamiają głównej aplikacji ani autoryzacji MusicKit. Build urządzeniowy aplikacji jest sprawdzany osobno w tym samym workflow.

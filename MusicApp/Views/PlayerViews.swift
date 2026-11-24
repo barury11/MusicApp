@@ -9,7 +9,10 @@ struct MiniPlayerView: View {
         HStack(spacing: 10) {
             HStack(spacing: 10) {
                 CoverArt(artwork: player.currentArtwork, albumID: player.albumKey, size: placement == .inline ? 28 : 40, radius: 6)
-                Text(player.currentTitle).font(.subheadline.weight(.medium)).lineLimit(1).frame(maxWidth: .infinity, alignment: .leading)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(player.currentTitle).font(.subheadline.weight(.medium)).lineLimit(1)
+                    if placement != .inline { Text(player.currentArtist).font(.caption).foregroundStyle(.secondary).lineLimit(1) }
+                }.frame(maxWidth: .infinity, alignment: .leading)
             }.contentShape(Rectangle()).onTapGesture { player.showPlayer = true }
                 .accessibilityElement(children: .combine).accessibilityAddTraits(.isButton).accessibilityAction { player.showPlayer = true }
             Button { player.toggle() } label: { Image(systemName: state.playbackStatus == .playing ? "pause.fill" : "play.fill").font(.title3).contentTransition(.symbolEffect(.replace)).frame(width: 38, height: 44) }.buttonStyle(.plain).accessibilityLabel(state.playbackStatus == .playing ? "Pauza" : "Odtwórz")
@@ -105,9 +108,9 @@ struct NowPlayingView: View {
                 }.scrollIndicators(.hidden)
             }.foregroundStyle(.white)
         }
-        .sheet(isPresented: $showQueue) { QueueView() }
-        .sheet(item: $lyricsSong) { song in LyricsView(song: song) }
-        .sheet(item: $playlistSong) { song in AddToPlaylistView(song: song) }
+        .sheet(isPresented: $showQueue) { QueueView().foregroundStyle(Color.primary).tint(Color.musicRed) }
+        .sheet(item: $lyricsSong) { song in LyricsView(song: song).foregroundStyle(Color.primary).tint(Color.musicRed) }
+        .sheet(item: $playlistSong) { song in AddToPlaylistView(song: song).foregroundStyle(Color.primary).tint(Color.musicRed) }
         .presentationBackground(.black)
     }
     private var playerBackground: some View {

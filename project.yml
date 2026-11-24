@@ -36,14 +36,21 @@ targets:
   MusicAppTests:
     type: bundle.unit-test
     platform: iOS
-    sources: [Tests]
-    dependencies:
-      - target: MusicApp
+    # Compile the actual storage/lyrics sources in a hostless test bundle.
+    # These tests must not launch MusicKit or require an Apple Music account.
+    sources:
+      - Tests
+      - MusicApp/Models/AlbumCustomization.swift
+      - MusicApp/Services/CustomizationStore.swift
+      - MusicApp/Services/LyricsService.swift
     settings:
       base:
         GENERATE_INFOPLIST_FILE: YES
         INFOPLIST_FILE: ''
         PRODUCT_BUNDLE_IDENTIFIER: pl.barury.MusicAppTests
+        TEST_HOST: ''
+        BUNDLE_LOADER: ''
+        ASSETCATALOG_COMPILER_APPICON_NAME: ''
 schemes:
   MusicApp:
     build:

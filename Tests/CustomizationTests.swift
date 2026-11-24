@@ -1,5 +1,4 @@
 import XCTest
-@testable import MusicApp
 
 final class CustomizationTests: XCTestCase {
     @MainActor func testCustomizationSurvivesRelaunchAndResetPreservesLyrics() throws {

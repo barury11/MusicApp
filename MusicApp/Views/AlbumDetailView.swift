@@ -96,7 +96,10 @@ struct AlbumDetailView: View {
                     Button("Odtwórz na końcu", systemImage: "text.line.last.and.arrowtriangle.forward") {
                         player.perform { try await player.engine.queue.insert(album, position: .tail) }
                     }
-                    if let url = album.url { ShareLink(item: url) { Label("Udostępnij album", systemImage: "square.and.arrow.up") } }
+                    if let url = album.url {
+                        ShareLink(item: url) { Label("Udostępnij album", systemImage: "square.and.arrow.up") }
+                        Link(destination: url) { Label("Otwórz w Apple Music", systemImage: "arrow.up.forward.app") }
+                    }
                     Divider()
                     Menu("Dostosuj", systemImage: "paintbrush.pointed") {
                         Button("Okładka kwadratowa", systemImage: "square") { editing = .square }

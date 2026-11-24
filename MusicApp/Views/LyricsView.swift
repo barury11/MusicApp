@@ -22,6 +22,7 @@ struct LyricsView: View {
     @State private var editing = false
     @AppStorage("lyricsAutoFetch") private var autoFetch = true
     private var override: String? { custom.lyrics(for: song) }
+    private var requestKey: String { "\(song.id.rawValue)|\(override == nil)|\(autoFetch)" }
     var body: some View {
         NavigationStack {
             ScrollView {
@@ -46,8 +47,8 @@ struct LyricsView: View {
                 ToolbarItem(placement: .topBarTrailing) { Button("Edytuj", systemImage: "square.and.pencil") { editing = true } }
             }
             .sheet(isPresented: $editing) { NavigationStack { LyricsEditorView(song: song) } }
-            .task(id: song.id) {
-                loading = true
+            .task(id: requestKey) {
+                error = nil; record = nil; loading = true
                 defer { loading = false }
                 guard override == nil, autoFetch else { loading = false; return }
                 do { record = try await LyricsService.shared.fetch(song.lyricsIdentity) }

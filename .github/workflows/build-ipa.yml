@@ -50,7 +50,9 @@ jobs:
           xcodebuild -project MusicApp.xcodeproj -scheme MusicApp \
             -configuration Debug -destination "platform=iOS Simulator,id=$MUSICAPP_SIMULATOR_ID" \
             -derivedDataPath build/simulator -resultBundlePath build/Tests.xcresult \
-            CODE_SIGNING_ALLOWED=NO test 2>&1 | tee build/tests.log
+            -parallel-testing-enabled NO -test-timeouts-enabled YES \
+            -default-test-execution-time-allowance 30 -maximum-test-execution-time-allowance 60 \
+            CODE_SIGNING_ALLOWED=YES CODE_SIGN_IDENTITY=- test 2>&1 | tee build/tests.log
       - name: Upload diagnostics
         if: always()
         uses: actions/upload-artifact@v4

@@ -39,7 +39,7 @@ struct AlbumEditorView: View {
             .task { await loadDraft() }
             .onChange(of: selectedPhoto) { _, item in selectPhoto(item) }
 
-        }.interactiveDismissDisabled(importBusy)
+        }.interactiveDismissDisabled(importBusy).foregroundStyle(Color.primary).tint(Color.musicRed)
     }
     private var editorForm: some View {
         Form {
@@ -70,8 +70,8 @@ struct AlbumEditorView: View {
                     }.disabled(draft.logo == nil)
                 case .colors:
                     Section {
-                        ColorPicker("Kolor tła", selection: $background, supportsOpacity: false).onChange(of: background) { _, color in if loaded { draft.backgroundHex = color.rgbHex } }
-                        ColorPicker("Tekst i przyciski", selection: $accent, supportsOpacity: false).onChange(of: accent) { _, color in if loaded { draft.accentHex = color.rgbHex } }
+                        ColorPicker("Kolor tła", selection: Binding(get: { background }, set: { background = $0; draft.backgroundHex = $0.rgbHex }), supportsOpacity: false)
+                        ColorPicker("Tekst i przyciski", selection: Binding(get: { accent }, set: { accent = $0; draft.accentHex = $0.rgbHex }), supportsOpacity: false)
                         Button("Przywróć kolory z okładki") {
                             resetColors()
                         }

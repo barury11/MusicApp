@@ -55,11 +55,12 @@ struct CoverArt: View {
 struct AlbumTile: View {
     let album: Album
     var size: CGFloat = 160
+    var showArtist = true
     var body: some View {
         VStack(alignment: .leading, spacing: 7) {
             CoverArt(artwork: album.artwork, albumID: album.id.rawValue, size: size)
             Text(album.title).font(.subheadline).foregroundStyle(.primary).lineLimit(1)
-            Text(album.artistName).font(.subheadline).foregroundStyle(.secondary).lineLimit(1)
+            if showArtist { Text(album.artistName).font(.subheadline).foregroundStyle(.secondary).lineLimit(1) }
         }.frame(width: size, alignment: .leading)
         .contentShape(Rectangle())
         .accessibilityElement(children: .combine)
@@ -155,13 +156,16 @@ struct SongRow: View {
                 Button("Dodaj do biblioteki", systemImage: "plus") { Task { await music.addSong(song) } }
                 Button("Dodaj do playlisty…", systemImage: "text.badge.plus") { addToPlaylist = true }
                 Button("Tekst utworu", systemImage: "quote.bubble") { lyrics = true }
-                if let url = song.url { ShareLink(item: url) { Label("Udostępnij utwór", systemImage: "square.and.arrow.up") } }
+                if let url = song.url {
+                    ShareLink(item: url) { Label("Udostępnij utwór", systemImage: "square.and.arrow.up") }
+                    Link(destination: url) { Label("Otwórz w Apple Music", systemImage: "arrow.up.forward.app") }
+                }
             } label: { Image(systemName: "ellipsis").font(.body.weight(.semibold)).frame(width: 38, height: 44).contentShape(Rectangle()) }
                 .tint(.primary).accessibilityLabel("Opcje: \(song.title)")
         }
         .frame(minHeight: showCover ? 62 : 48)
-        .sheet(isPresented: $lyrics) { LyricsView(song: song) }
-        .sheet(isPresented: $addToPlaylist) { AddToPlaylistView(song: song) }
+        .sheet(isPresented: $lyrics) { LyricsView(song: song).foregroundStyle(Color.primary).tint(Color.musicRed) }
+        .sheet(isPresented: $addToPlaylist) { AddToPlaylistView(song: song).foregroundStyle(Color.primary).tint(Color.musicRed) }
     }
 }
 

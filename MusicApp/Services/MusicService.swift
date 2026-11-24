@@ -82,6 +82,7 @@ final class MusicService: ObservableObject {
                 songs.append(contentsOf: next); songBatch = next
             }
             var playlistRequest = MusicLibraryRequest<Playlist>()
+            playlistRequest.includeOnlyDownloadedContent = downloadedOnly
             playlistRequest.limit = 100
             var playlistBatch = try await playlistRequest.response().items
             playlists = Array(playlistBatch)
@@ -91,6 +92,7 @@ final class MusicService: ObservableObject {
                 playlists.append(contentsOf: next); playlistBatch = next
             }
             var artistRequest = MusicLibraryRequest<Artist>()
+            artistRequest.includeOnlyDownloadedContent = downloadedOnly
             artistRequest.limit = 100
             var artistBatch = try await artistRequest.response().items
             artists = Array(artistBatch)
@@ -147,7 +149,7 @@ final class MusicService: ObservableObject {
         return tracks
     }
     func addAlbum(_ album: Album) async {
-        do { try await MusicLibrary.shared.add(album); message = "Dodano album do biblioteki"; await loadLibrary() }
+        do { try await MusicLibrary.shared.add(album); message = "Dodano album do biblioteki"; await loadLibrary(downloadedOnly: downloadedOnly) }
         catch { message = error.localizedDescription }
     }
     func addSong(_ song: Song) async {

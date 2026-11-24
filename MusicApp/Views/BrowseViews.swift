@@ -113,14 +113,13 @@ struct LibraryView: View {
     var body: some View {
         ScrollView {
             LazyVStack(alignment: .leading, spacing: 0) {
+                if !pinnedAlbums.isEmpty {
+                    AlbumGrid(albums: pinnedAlbums, columns: 3, showArtist: false).padding(.top, 12).padding(.bottom, 22)
+                }
                 categories
-                Toggle(isOn: $downloaded) { Label("Pobrane", systemImage: "arrow.down.circle").font(.title3) }.tint(Color.musicRed).padding(.vertical, 14)
+                Toggle(isOn: $downloaded) { Label("Pobrane", systemImage: "arrow.down.circle").font(.title3) }.tint(Color.musicRed).padding(.vertical, 14).disabled(music.loadingLibrary)
                 if music.loadingLibrary { ProgressView("Wczytywanie biblioteki…").font(.footnote).padding(.vertical) }
                 if let error = music.libraryError { InlineError(text: error) { Task { await music.loadLibrary(downloadedOnly: downloaded) } }.padding(.vertical, 12) }
-                if !pinnedAlbums.isEmpty {
-                    Text("Przypięte").font(.title2.bold()).padding(.top, 20).padding(.bottom, 14)
-                    AlbumGrid(albums: pinnedAlbums)
-                }
                 Text("Ostatnio dodane").font(.title2.bold()).padding(.top, 24).padding(.bottom, 16)
                 AlbumGrid(albums: music.albums)
                 if music.albums.isEmpty && !music.loadingLibrary {
@@ -157,15 +156,18 @@ struct LibraryView: View {
 
 struct AlbumGrid: View {
     let albums: [Album]
+    var columns = 2
+    var showArtist = true
     @Namespace private var namespace
     var body: some View {
         GeometryReader { geometry in
-            let size = max(100, (geometry.size.width - 18) / 2)
-            LazyVGrid(columns: [GridItem(.flexible(), spacing: 18), GridItem(.flexible())], alignment: .leading, spacing: 22) {
+            let count = max(1, columns)
+            let size = max(60, (geometry.size.width - CGFloat(count - 1) * 18) / CGFloat(count))
+            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 18), count: count), alignment: .leading, spacing: 22) {
                 ForEach(albums) { album in
                     NavigationLink {
                         AlbumDetailView(album: album).navigationTransition(.zoom(sourceID: album.id, in: namespace))
-                    } label: { AlbumTile(album: album, size: size).matchedTransitionSource(id: album.id, in: namespace) }.buttonStyle(.plain)
+                    } label: { AlbumTile(album: album, size: size, showArtist: showArtist).matchedTransitionSource(id: album.id, in: namespace) }.buttonStyle(.plain)
                 }
             }
             .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { measuredHeight = $0 }

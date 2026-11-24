@@ -25,6 +25,7 @@ targets:
         excludes: [Resources/Info.plist]
     dependencies:
       - sdk: MusicKit.framework
+      - sdk: AVKit.framework
       - sdk: MediaPlayer.framework
       - sdk: PhotosUI.framework
       - sdk: Security.framework

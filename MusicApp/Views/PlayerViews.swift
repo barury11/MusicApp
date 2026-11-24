@@ -60,6 +60,7 @@ struct NowPlayingView: View {
                             }.frame(maxWidth: .infinity, alignment: .leading)
                             Menu {
                                 if let song = player.currentSong {
+                                    Button("Dodaj do ulubionych", systemImage: "star") { Task { await music.favorite(id: song.id, url: song.url, type: "songs") } }
                                     Button("Dodaj do biblioteki", systemImage: "plus") { Task { await music.addSong(song) } }
                                     Button("Dodaj do playlisty…", systemImage: "text.badge.plus") { playlistSong = song }
                                     Button("Tekst utworu", systemImage: "quote.bubble") { lyricsSong = song }
@@ -136,17 +137,25 @@ struct QueueView: View {
     @ObservedObject private var queue = ApplicationMusicPlayer.shared.queue
     @ObservedObject private var state = ApplicationMusicPlayer.shared.state
     @Environment(\.dismiss) private var dismiss
+    private var repeatMode: MusicPlayer.RepeatMode { state.repeatMode ?? MusicPlayer.RepeatMode.none }
+    private var queueControls: some View {
+        HStack {
+            Text("Odtwarzane dalej").font(.headline)
+            Spacer()
+            Button { player.toggleShuffle() } label: {
+                Image(systemName: "shuffle").frame(width: 40, height: 40)
+                    .background(state.shuffleMode == .songs ? Color.musicRed.opacity(0.15) : Color.clear, in: RoundedRectangle(cornerRadius: 10))
+            }.accessibilityLabel("Mieszaj").accessibilityValue(state.shuffleMode == .songs ? "Włączone" : "Wyłączone")
+            Button { player.toggleRepeat() } label: {
+                Image(systemName: repeatMode == .one ? "repeat.1" : "repeat").frame(width: 40, height: 40)
+                    .background(repeatMode != .none ? Color.musicRed.opacity(0.15) : Color.clear, in: RoundedRectangle(cornerRadius: 10))
+            }.accessibilityLabel("Powtarzanie").accessibilityValue(repeatMode == .none ? "Wyłączone" : repeatMode == .one ? "Jeden utwór" : "Wszystko")
+        }.buttonStyle(.plain).tint(Color.musicRed)
+    }
     var body: some View {
         NavigationStack {
             List {
-                Section {
-                    HStack {
-                        Text("Odtwarzane dalej").font(.headline)
-                        Spacer()
-                        Button { player.toggleShuffle() } label: { Image(systemName: "shuffle").frame(width: 40, height: 40).background(state.shuffleMode == .songs ? Color.musicRed.opacity(0.15) : .clear, in: RoundedRectangle(cornerRadius: 10)) }.accessibilityLabel("Mieszaj").accessibilityValue(state.shuffleMode == .songs ? "Włączone" : "Wyłączone")
-                        Button { player.toggleRepeat() } label: { Image(systemName: state.repeatMode == .one ? "repeat.1" : "repeat").frame(width: 40, height: 40).background(state.repeatMode != .none ? Color.musicRed.opacity(0.15) : .clear, in: RoundedRectangle(cornerRadius: 10)) }.accessibilityLabel("Powtarzanie").accessibilityValue(state.repeatMode == .none ? "Wyłączone" : state.repeatMode == .one ? "Jeden utwór" : "Wszystko")
-                    }.buttonStyle(.plain).tint(.musicRed)
-                }
+                Section { queueControls }
                 Section {
                     ForEach(Array(queue.entries)) { entry in
                         Button { player.select(entry) } label: {
@@ -154,7 +163,7 @@ struct QueueView: View {
                                 CoverArt(artwork: entry.artwork, size: 48)
                                 VStack(alignment: .leading, spacing: 3) { Text(entry.title).foregroundStyle(queue.currentEntry?.id == entry.id ? Color.musicRed : .primary); Text(entry.subtitle ?? "").font(.caption).foregroundStyle(.secondary) }
                                 Spacer()
-                                if queue.currentEntry?.id == entry.id { Image(systemName: "speaker.wave.2.fill").foregroundStyle(.musicRed) }
+                                if queue.currentEntry?.id == entry.id { Image(systemName: "speaker.wave.2.fill").foregroundStyle(Color.musicRed) }
                             }
                         }
                     }

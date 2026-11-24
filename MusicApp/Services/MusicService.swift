@@ -154,6 +154,25 @@ final class MusicService: ObservableObject {
         do { try await MusicLibrary.shared.add(song); message = "Dodano utwór do biblioteki" }
         catch { message = error.localizedDescription }
     }
+    func favorite(id: MusicItemID, url: URL?, type: String) async {
+        var catalogID = id.rawValue
+        if !catalogID.allSatisfy(\.isNumber) && type != "playlists", let url, url.host == "music.apple.com" {
+            let queryID = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems?.first(where: { $0.name == "i" })?.value
+            catalogID = (type == "songs" ? queryID : nil) ?? url.lastPathComponent
+        }
+        guard (type == "playlists" && catalogID.hasPrefix("pl.")) || (!catalogID.isEmpty && catalogID.allSatisfy(\.isNumber)) else {
+            message = "Nie znaleziono odpowiednika w katalogu. Otwórz tę pozycję w wyszukiwaniu Apple Music, aby dodać ją do ulubionych."
+            return
+        }
+        do {
+            var components = URLComponents(string: "https://api.music.apple.com/v1/me/favorites")!
+            components.queryItems = [URLQueryItem(name: "ids[\(type)]", value: catalogID)]
+            var request = URLRequest(url: components.url!)
+            request.httpMethod = "POST"
+            _ = try await MusicDataRequest(urlRequest: request).response()
+            message = "Wysłano do Apple Music prośbę o dodanie do ulubionych."
+        } catch { message = error.localizedDescription }
+    }
     func createPlaylist(name: String) async {
         guard !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
         do {

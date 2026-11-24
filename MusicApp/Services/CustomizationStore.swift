@@ -1,14 +1,16 @@
 import SwiftUI
 import UIKit
+import ImageIO
 
 @MainActor
 final class CustomizationStore: ObservableObject {
     @Published private(set) var archive = CustomizationArchive()
     @Published var errorMessage: String?
     private let directory: URL
-    private var imageCache: [String: UIImage] = [:]
+    private let imageCache = NSCache<NSString, UIImage>()
 
     init(directory: URL? = nil) {
+        imageCache.totalCostLimit = 64 * 1024 * 1024
         self.directory = directory ?? FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0].appendingPathComponent("AlbumStudio", isDirectory: true)
         do {
             try FileManager.default.createDirectory(at: self.directory, withIntermediateDirectories: true)
@@ -28,10 +30,13 @@ final class CustomizationStore: ObservableObject {
         next.albums[id] = value
         try persist(next)
     }
-    func saveLyrics(_ text: String, id: String) throws {
+    func saveLyrics(_ text: String, id: String) throws { try saveLyrics(text, ids: [id]) }
+    func saveLyrics(_ text: String, ids: [String]) throws {
         var next = archive
-        if text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { next.lyrics.removeValue(forKey: id) }
-        else { next.lyrics[id] = text }
+        for id in ids {
+            if text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { next.lyrics.removeValue(forKey: id) }
+            else { next.lyrics[id] = text }
+        }
         try persist(next)
     }
     func togglePin(_ id: String) throws {
@@ -52,17 +57,15 @@ final class CustomizationStore: ObservableObject {
         // Do not delete previous artwork here: a draft editor can still reference it.
     }
     func importImage(_ data: Data, preserveTransparency: Bool) throws -> String {
-        guard data.count <= 30_000_000, let source = UIImage(data: data), source.size.width > 0, source.size.height > 0 else { throw StoreError.invalidImage }
-        // Flatten orientation and cap decoded dimensions; PNG preserves a logo's alpha channel.
-        let ratio = min(1, 2400 / max(source.size.width, source.size.height))
-        let size = CGSize(width: source.size.width * ratio, height: source.size.height * ratio)
-        let format = UIGraphicsImageRendererFormat()
-        format.scale = 1
-        format.opaque = !preserveTransparency
-        let rendered = UIGraphicsImageRenderer(size: size, format: format).image { context in
-            if !preserveTransparency { UIColor.black.setFill(); context.fill(CGRect(origin: .zero, size: size)) }
-            source.draw(in: CGRect(origin: .zero, size: size))
-        }
+        guard data.count <= 30_000_000,
+              let source = CGImageSourceCreateWithData(data as CFData, nil),
+              let thumbnail = CGImageSourceCreateThumbnailAtIndex(source, 0, [
+                kCGImageSourceCreateThumbnailFromImageAlways: true,
+                kCGImageSourceCreateThumbnailWithTransform: true,
+                kCGImageSourceThumbnailMaxPixelSize: 2400,
+                kCGImageSourceShouldCacheImmediately: true
+              ] as CFDictionary) else { throw StoreError.invalidImage }
+        let rendered = UIImage(cgImage: thumbnail)
         let filename = UUID().uuidString + (preserveTransparency ? ".png" : ".jpg")
         guard let bytes = preserveTransparency ? rendered.pngData() : rendered.jpegData(compressionQuality: 0.9) else { throw StoreError.invalidImage }
         try bytes.write(to: directory.appendingPathComponent(filename), options: .atomic)
@@ -70,10 +73,10 @@ final class CustomizationStore: ObservableObject {
     }
     func image(_ filename: String?) -> UIImage? {
         guard let filename, filename == URL(fileURLWithPath: filename).lastPathComponent else { return nil }
-        if let cached = imageCache[filename] { return cached }
+        if let cached = imageCache.object(forKey: filename as NSString) { return cached }
         guard let image = UIImage(contentsOfFile: directory.appendingPathComponent(filename).path) else { return nil }
-        if imageCache.count > 24 { imageCache.removeAll() }
-        imageCache[filename] = image
+        let cost = image.cgImage.map { $0.bytesPerRow * $0.height } ?? 0
+        imageCache.setObject(image, forKey: filename as NSString, cost: cost)
         return image
     }
     enum StoreError: LocalizedError {

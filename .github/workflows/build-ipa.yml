@@ -11,7 +11,7 @@ concurrency:
   cancel-in-progress: true
 jobs:
   build:
-    runs-on: macos-15
+    runs-on: macos-latest
     timeout-minutes: 35
     steps:
       - uses: actions/checkout@v4
@@ -27,6 +27,7 @@ jobs:
       - name: Build for iPhone and iPad without signing
         run: |
           set -o pipefail
+          mkdir -p build
           xcodebuild -project MusicApp.xcodeproj -scheme MusicApp \
             -configuration Release -sdk iphoneos -destination 'generic/platform=iOS' \
             -derivedDataPath build/device \

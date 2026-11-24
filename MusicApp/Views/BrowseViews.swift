@@ -60,19 +60,7 @@ struct RadioView: View {
         ScrollView {
             LazyVStack(alignment: .leading, spacing: 22) {
                 Text("Odkryj coś nowego").font(.title2.bold())
-                ForEach(stations) { station in
-                    Button { Task { await player.playStation(station) } } label: {
-                        HStack(spacing: 16) {
-                            CoverArt(artwork: station.artwork, size: 92, radius: 12)
-                            VStack(alignment: .leading, spacing: 7) {
-                                Text(station.name).font(.headline).foregroundStyle(.primary)
-                                Label("Odtwórz stację", systemImage: "dot.radiowaves.left.and.right").font(.subheadline).foregroundStyle(.secondary)
-                            }
-                            Spacer()
-                            Image(systemName: "play.fill").foregroundStyle(.musicRed)
-                        }
-                    }.buttonStyle(.plain)
-                }
+                ForEach(stations, id: \.id) { station in StationRow(station: station) }
                 if loading { ProgressView().frame(maxWidth: .infinity).padding() }
                 if let error { InlineError(text: error) { Task { await load() } } }
                 if !loading && stations.isEmpty && error == nil { ContentUnavailableView("Brak stacji", systemImage: "radio", description: Text("Stacje pojawią się po połączeniu z katalogiem Apple Music.")) }
@@ -87,6 +75,24 @@ struct RadioView: View {
             request.limit = 25
             catalogStations = Array(try await request.response().stations)
         } catch { self.error = error.localizedDescription }
+    }
+}
+
+private struct StationRow: View {
+    @EnvironmentObject private var player: PlaybackService
+    let station: Station
+    var body: some View {
+        Button { Task { await player.playStation(station) } } label: {
+            HStack(spacing: 16) {
+                CoverArt(artwork: station.artwork, size: 92, radius: 12)
+                VStack(alignment: .leading, spacing: 7) {
+                    Text(station.name).font(.headline).foregroundStyle(.primary)
+                    Label("Odtwórz stację", systemImage: "dot.radiowaves.left.and.right").font(.subheadline).foregroundStyle(.secondary)
+                }
+                Spacer()
+                Image(systemName: "play.fill").foregroundStyle(Color.musicRed)
+            }
+        }.buttonStyle(.plain)
     }
 }
 
@@ -107,26 +113,13 @@ struct LibraryView: View {
     var body: some View {
         ScrollView {
             LazyVStack(alignment: .leading, spacing: 0) {
-                ForEach(LibraryDestination.allCases) { destination in
-                    NavigationLink {
-                        LibraryCollectionView(kind: destination.rawValue)
-                    } label: {
-                        HStack(spacing: 16) {
-                            Image(systemName: destination.icon).foregroundStyle(.musicRed).font(.title2).frame(width: 28)
-                            Text(destination.rawValue).font(.title3).foregroundStyle(.primary)
-                            Spacer()
-                            Image(systemName: "chevron.right").foregroundStyle(.tertiary).font(.subheadline.weight(.semibold))
-                        }.padding(.vertical, 13)
-                    }.buttonStyle(.plain)
-                    Divider().padding(.leading, 44)
-                }
-                Toggle(isOn: $downloaded) { Label("Pobrane", systemImage: "arrow.down.circle").font(.title3) }.tint(.musicRed).padding(.vertical, 14)
+                categories
+                Toggle(isOn: $downloaded) { Label("Pobrane", systemImage: "arrow.down.circle").font(.title3) }.tint(Color.musicRed).padding(.vertical, 14)
                 if music.loadingLibrary { ProgressView("Wczytywanie biblioteki…").font(.footnote).padding(.vertical) }
                 if let error = music.libraryError { InlineError(text: error) { Task { await music.loadLibrary(downloadedOnly: downloaded) } }.padding(.vertical, 12) }
-                let pinned = music.albums.filter { custom.isPinned($0.id.rawValue) }
-                if !pinned.isEmpty {
+                if !pinnedAlbums.isEmpty {
                     Text("Przypięte").font(.title2.bold()).padding(.top, 20).padding(.bottom, 14)
-                    AlbumGrid(albums: pinned)
+                    AlbumGrid(albums: pinnedAlbums)
                 }
                 Text("Ostatnio dodane").font(.title2.bold()).padding(.top, 24).padding(.bottom, 16)
                 AlbumGrid(albums: music.albums)
@@ -145,6 +138,21 @@ struct LibraryView: View {
         .onChange(of: downloaded) { _, value in Task { await music.loadLibrary(downloadedOnly: value) } }
         .refreshable { await music.loadLibrary(downloadedOnly: downloaded) }
     }
+    private var pinnedAlbums: [Album] { music.albums.filter { custom.isPinned($0.id.rawValue) } }
+    private var categories: some View {
+        ForEach(LibraryDestination.allCases) { destination in
+            NavigationLink { LibraryCollectionView(kind: destination.rawValue) } label: {
+                HStack(spacing: 16) {
+                    Image(systemName: destination.icon).foregroundStyle(Color.musicRed).font(.title2).frame(width: 28)
+                    Text(destination.rawValue).font(.title3).foregroundStyle(.primary)
+                    Spacer()
+                    Image(systemName: "chevron.right").foregroundStyle(.tertiary).font(.subheadline.weight(.semibold))
+                }.padding(.vertical, 13)
+            }.buttonStyle(.plain)
+            Divider().padding(.leading, 44)
+        }
+    }
+
 }
 
 struct AlbumGrid: View {

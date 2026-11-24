@@ -4,7 +4,12 @@ import UniformTypeIdentifiers
 
 extension Song {
     var lyricsKey: String { isrc.map { "isrc:" + $0 } ?? "song:" + id.rawValue }
+    var lyricsKeys: [String] { Array(Set([lyricsKey, "song:" + id.rawValue])) }
     var lyricsIdentity: LyricsIdentity { LyricsIdentity(title: title, artist: artistName, album: albumTitle ?? "", duration: duration ?? 0) }
+}
+
+extension CustomizationStore {
+    func lyrics(for song: Song) -> String? { lyrics(song.lyricsKey) ?? lyrics("song:" + song.id.rawValue) }
 }
 
 struct LyricsView: View {
@@ -16,7 +21,7 @@ struct LyricsView: View {
     @State private var error: String?
     @State private var editing = false
     @AppStorage("lyricsAutoFetch") private var autoFetch = true
-    private var override: String? { custom.lyrics(song.lyricsKey) }
+    private var override: String? { custom.lyrics(for: song) }
     var body: some View {
         NavigationStack {
             ScrollView {
@@ -70,12 +75,12 @@ struct LyricsEditorView: View {
             HStack {
                 Button("Importuj TXT", systemImage: "doc") { showImporter = true }
                 Spacer()
-                Button("Usuń własny tekst", role: .destructive) { confirmRemove = true }.disabled(custom.lyrics(song.lyricsKey) == nil)
+                Button("Usuń własny tekst", role: .destructive) { confirmRemove = true }.disabled(custom.lyrics(for: song) == nil)
             }.font(.subheadline)
         }.padding(20)
         .navigationTitle("Własny tekst").navigationBarTitleDisplayMode(.inline)
         .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Zapisz") { save(text) }.fontWeight(.semibold) } }
-        .task { if !initialized { text = custom.lyrics(song.lyricsKey) ?? ""; initialized = true } }
+        .task { if !initialized { text = custom.lyrics(for: song) ?? ""; initialized = true } }
         .fileImporter(isPresented: $showImporter, allowedContentTypes: [.plainText]) { result in
             do {
                 let url = try result.get(); let access = url.startAccessingSecurityScopedResource()
@@ -89,7 +94,7 @@ struct LyricsEditorView: View {
         .alert("Błąd zapisu", isPresented: Binding(get: { error != nil }, set: { if !$0 { error = nil } })) { Button("OK", role: .cancel) { error = nil } } message: { Text(error ?? "") }
     }
     private func save(_ value: String) {
-        do { try custom.saveLyrics(value, id: song.lyricsKey); dismiss() }
+        do { try custom.saveLyrics(value, ids: song.lyricsKeys); dismiss() }
         catch { self.error = error.localizedDescription }
     }
 }

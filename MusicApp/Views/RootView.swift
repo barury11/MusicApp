@@ -58,7 +58,7 @@ struct WelcomeView: View {
     var body: some View {
         VStack(spacing: 24) {
             Spacer()
-            Image(systemName: "music.note").font(.system(size: 76, weight: .medium)).foregroundStyle(.musicRed).padding(30).glassEffect(in: .rect(cornerRadius: 32))
+            Image(systemName: "music.note").font(.system(size: 76, weight: .medium)).foregroundStyle(Color.musicRed).padding(30).glassEffect(in: .rect(cornerRadius: 32))
             VStack(spacing: 12) {
                 Text("Twoja muzyka.\nTwój własny styl.").font(.system(size: 36, weight: .bold)).multilineTextAlignment(.center)
                 Text("Biblioteka Apple Music i albumy, które możesz urządzić po swojemu.").font(.title3).foregroundStyle(.secondary).multilineTextAlignment(.center)

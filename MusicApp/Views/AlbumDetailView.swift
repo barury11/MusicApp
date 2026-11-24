@@ -12,6 +12,7 @@ struct AlbumDetailView: View {
     @State private var error: String?
     @State private var editing: AlbumEditorSection?
     @State private var confirmReset = false
+    @State private var scrolledPastHeader = false
     private var id: String { album.id.rawValue }
     private var style: AlbumCustomization { custom.album(id) }
     private var background: Color {
@@ -43,15 +44,9 @@ struct AlbumDetailView: View {
                         albumIdentity
                     }.frame(maxWidth: .infinity).padding(.top, 22).padding(.horizontal, 24)
                 }
-                HStack(spacing: 14) {
-                    Button { Task { await player.play(tracks, albumID: id) } } label: { Label("Odtwórz", systemImage: "play.fill").frame(maxWidth: .infinity).frame(height: 48) }
-                    Button { Task { await player.play(tracks, albumID: id, shuffle: true) } } label: { Label("Mieszaj", systemImage: "shuffle").frame(maxWidth: .infinity).frame(height: 48) }
-                }
-                .font(.headline).buttonStyle(.plain)
-                .backgroundStyle(foreground.opacity(0.1))
-                .padding(.horizontal, 20).padding(.top, 22)
-                .disabled(tracks.isEmpty || player.isWorking)
-                .modifier(AlbumPlayButtons())
+                albumPlaybackControls
+                    .padding(.horizontal, 20).padding(.top, 18)
+                    .disabled(tracks.isEmpty || player.isWorking)
                 if loading { ProgressView().tint(foreground).padding(35) }
                 if let error { InlineError(text: error) { Task { await load() } }.padding(20) }
                 LazyVStack(spacing: 0) {
@@ -81,12 +76,16 @@ struct AlbumDetailView: View {
         }
         .coordinateSpace(name: "albumScroll")
         .background(background.ignoresSafeArea())
+        .ignoresSafeArea(edges: portrait == nil ? [] : .top)
+        .onScrollGeometryChange(for: Bool.self) { geometry in geometry.contentOffset.y > (portrait == nil ? 320 : 400) } action: { _, value in scrolledPastHeader = value }
         .foregroundStyle(foreground).tint(foreground)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
-            ToolbarItem(placement: .principal) { Text(album.title).font(.subheadline.weight(.semibold)).lineLimit(1) }
+            ToolbarItem(placement: .principal) { Text(scrolledPastHeader ? album.title : "").font(.subheadline.weight(.semibold)).lineLimit(1) }
+            if let url = album.url { ToolbarItem(placement: .topBarTrailing) { ShareLink(item: url) { Image(systemName: "square.and.arrow.up") }.accessibilityLabel("Udostępnij album") } }
             ToolbarItem(placement: .topBarTrailing) {
                 Menu {
+                    Button("Dodaj do ulubionych", systemImage: "star") { Task { await music.favorite(id: album.id, url: album.url, type: "albums") } }
                     Button("Dodaj do biblioteki", systemImage: "plus") { Task { await music.addAlbum(album) } }
                     Button(custom.isPinned(id) ? "Odepnij album" : "Przypnij album", systemImage: custom.isPinned(id) ? "pin.slash" : "pin") {
                         do { try custom.togglePin(id) } catch { custom.errorMessage = error.localizedDescription }
@@ -117,6 +116,30 @@ struct AlbumDetailView: View {
         }
         .task(id: id) { await load() }
     }
+    @ViewBuilder private var albumPlaybackControls: some View {
+        if portrait != nil {
+            HStack(spacing: 14) {
+                Button { Task { await player.play(tracks, albumID: id, shuffle: true) } } label: {
+                    Image(systemName: "shuffle").font(.title3.weight(.semibold)).frame(width: 46, height: 46).background(foreground.opacity(0.12), in: Circle())
+                }.accessibilityLabel("Mieszaj album")
+                Button { Task { await player.play(tracks, albumID: id) } } label: {
+                    Label("Odtwórz", systemImage: "play.fill").font(.headline).frame(maxWidth: .infinity).frame(height: 46).background(foreground, in: Capsule()).foregroundStyle(background)
+                }
+                Button { Task { await music.addAlbum(album) } } label: {
+                    Image(systemName: "plus").font(.title3.weight(.semibold)).frame(width: 46, height: 46).background(foreground.opacity(0.12), in: Circle())
+                }.accessibilityLabel("Dodaj album do biblioteki")
+            }.buttonStyle(.plain).padding(.horizontal, 28)
+        } else {
+            HStack(spacing: 14) {
+                Button { Task { await player.play(tracks, albumID: id) } } label: {
+                    Label("Odtwórz", systemImage: "play.fill").frame(maxWidth: .infinity).frame(height: 48).background(foreground.opacity(0.12), in: RoundedRectangle(cornerRadius: 12))
+                }
+                Button { Task { await player.play(tracks, albumID: id, shuffle: true) } } label: {
+                    Label("Mieszaj", systemImage: "shuffle").frame(maxWidth: .infinity).frame(height: 48).background(foreground.opacity(0.12), in: RoundedRectangle(cornerRadius: 12))
+                }
+            }.font(.headline).buttonStyle(.plain)
+        }
+    }
     @ViewBuilder private var albumIdentity: some View {
         VStack(spacing: 6) {
             if let image = custom.image(style.logo) {
@@ -137,10 +160,6 @@ struct AlbumDetailView: View {
         do { tracks = try await music.albumTracks(album) }
         catch { self.error = error.localizedDescription }
     }
-}
-
-private struct AlbumPlayButtons: ViewModifier {
-    func body(content: Content) -> some View { content.buttonBorderShape(.roundedRectangle(radius: 12)).buttonStyle(.bordered) }
 }
 
 struct PlaylistDetailView: View {
@@ -172,7 +191,14 @@ struct PlaylistDetailView: View {
             }.padding(.horizontal, 20).padding(.bottom, 24)
         }
         .navigationTitle(playlist.name).navigationBarTitleDisplayMode(.inline)
-        .toolbar { if let url = playlist.url { ToolbarItem(placement: .topBarTrailing) { ShareLink(item: url) } } }
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Menu("Opcje playlisty", systemImage: "ellipsis") {
+                    Button("Dodaj do ulubionych", systemImage: "star") { Task { await music.favorite(id: playlist.id, url: playlist.url, type: "playlists") } }
+                    if let url = playlist.url { ShareLink(item: url) { Label("Udostępnij playlistę", systemImage: "square.and.arrow.up") } }
+                }
+            }
+        }
         .task {
             do { tracks = try await music.playlistTracks(playlist) } catch { self.error = error.localizedDescription }
             loading = false

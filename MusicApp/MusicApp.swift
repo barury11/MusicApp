@@ -12,7 +12,7 @@ struct MusicApp: App {
                 .environmentObject(music)
                 .environmentObject(player)
                 .environmentObject(custom)
-                .tint(.musicRed)
+                .tint(Color.musicRed)
                 .task { await music.restoreAuthorization() }
         }
     }

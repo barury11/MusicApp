@@ -8,3 +8,6 @@ xcuserdata/
 *.xcodeproj/
 .env
 *.p8
+
+__pycache__/
+*.pyc

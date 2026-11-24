@@ -1,6 +1,7 @@
 import SwiftUI
 import MusicKit
 import MediaPlayer
+import AVKit
 import UIKit
 
 extension Color {
@@ -150,6 +151,7 @@ struct SongRow: View {
                 Button("Odtwórz następny", systemImage: "text.line.first.and.arrowtriangle.forward") { player.enqueue(song, next: true) }
                 Button("Odtwórz na końcu", systemImage: "text.line.last.and.arrowtriangle.forward") { player.enqueue(song, next: false) }
                 Divider()
+                Button("Dodaj do ulubionych", systemImage: "star") { Task { await music.favorite(id: song.id, url: song.url, type: "songs") } }
                 Button("Dodaj do biblioteki", systemImage: "plus") { Task { await music.addSong(song) } }
                 Button("Dodaj do playlisty…", systemImage: "text.badge.plus") { addToPlaylist = true }
                 Button("Tekst utworu", systemImage: "quote.bubble") { lyrics = true }
@@ -195,13 +197,14 @@ struct InlineError: View {
 }
 
 struct AirPlayButton: UIViewRepresentable {
-    func makeUIView(context: Context) -> MPVolumeView {
-        let view = MPVolumeView(frame: .zero)
-        view.showsVolumeSlider = false
+    func makeUIView(context: Context) -> AVRoutePickerView {
+        let view = AVRoutePickerView(frame: .zero)
         view.tintColor = .white
+        view.activeTintColor = .systemPink
+        view.prioritizesVideoDevices = false
         return view
     }
-    func updateUIView(_ uiView: MPVolumeView, context: Context) { }
+    func updateUIView(_ uiView: AVRoutePickerView, context: Context) { }
 }
 
 struct SystemVolumeSlider: UIViewRepresentable {

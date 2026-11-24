@@ -15,10 +15,14 @@ final class PlaybackService: ObservableObject {
     @Published var showPlayer = false
     @Published var errorMessage: String?
     @Published var isWorking = false
+    @Published var isRadio = false
     private var songAlbumIDs: [String: String] = [:]
     private var poller: Task<Void, Never>?
 
     init() {
+        if engine.state.repeatMode == nil { engine.state.repeatMode = MusicPlayer.RepeatMode.none }
+        if engine.state.shuffleMode == nil { engine.state.shuffleMode = .off }
+        applyPlaybackPreferences()
         poller = Task { [weak self] in
             while !Task.isCancelled {
                 self?.synchronize()
@@ -31,12 +35,19 @@ final class PlaybackService: ObservableObject {
     var hasItem: Bool { engine.queue.currentEntry != nil }
     var entries: [MusicPlayer.Queue.Entry] { Array(engine.queue.entries) }
 
+    func applyPlaybackPreferences() {
+        if UserDefaults.standard.bool(forKey: "crossfadeEnabled") {
+            let duration = UserDefaults.standard.object(forKey: "crossfadeSeconds") as? Double ?? 4
+            engine.transition = .crossfade(options: .init(duration: min(12, max(1, duration))))
+        } else { engine.transition = MusicPlayer.Transition.none }
+    }
     func perform(_ action: @escaping () async throws -> Void) {
         Task { do { try await action(); synchronize() } catch { errorMessage = error.localizedDescription } }
     }
     func play(_ tracks: [Track], startingAt track: Track? = nil, albumID: String? = nil, shuffle: Bool = false) async {
         guard !tracks.isEmpty, !isWorking else { return }
         isWorking = true
+        isRadio = false
         defer { isWorking = false }
         if let albumID {
             for item in tracks { if case .song(let song) = item { songAlbumIDs[song.id.rawValue] = albumID } }
@@ -52,6 +63,7 @@ final class PlaybackService: ObservableObject {
         await play(songs.map { Track.song($0) }, startingAt: song.map { Track.song($0) }, shuffle: shuffle)
     }
     func playStation(_ station: Station) async {
+        isRadio = true
         do {
             engine.queue = ApplicationMusicPlayer.Queue(for: [station])
             try await engine.play(); synchronize()
@@ -76,10 +88,10 @@ final class PlaybackService: ObservableObject {
     }
     func toggleShuffle() { engine.state.shuffleMode = engine.state.shuffleMode == .off ? .songs : .off }
     func toggleRepeat() {
-        switch engine.state.repeatMode {
-        case .none: engine.state.repeatMode = .all
+        switch engine.state.repeatMode ?? MusicPlayer.RepeatMode.none {
+        case MusicPlayer.RepeatMode.none: engine.state.repeatMode = .all
         case .all: engine.state.repeatMode = .one
-        default: engine.state.repeatMode = .none
+        default: engine.state.repeatMode = MusicPlayer.RepeatMode.none
         }
     }
     private func synchronize() {
@@ -91,7 +103,7 @@ final class PlaybackService: ObservableObject {
             currentArtwork = entry.artwork
             if case .song(let song) = entry.item {
                 currentSong = song
-                duration = song.duration ?? 0
+                duration = isRadio ? 0 : song.duration ?? 0
                 albumKey = songAlbumIDs[song.id.rawValue] ?? song.albums?.first?.id.rawValue
             } else {
                 currentSong = nil; duration = 0; albumKey = nil

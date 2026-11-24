@@ -3,12 +3,15 @@ import MusicKit
 
 struct SettingsView: View {
     @EnvironmentObject private var music: MusicService
+    @EnvironmentObject private var player: PlaybackService
     @Environment(\.dismiss) private var dismiss
     @State private var token = ""
     @State private var error: String?
     @State private var saved = false
     @State private var applying = false
     @AppStorage("lyricsAutoFetch") private var autoLyrics = true
+    @AppStorage("crossfadeEnabled") private var crossfade = false
+    @AppStorage("crossfadeSeconds") private var crossfadeSeconds = 4.0
     var body: some View {
         NavigationStack {
             Form {
@@ -17,6 +20,17 @@ struct SettingsView: View {
                     LabeledContent("Streaming katalogu", value: music.canPlayCatalog ? "Dostępny" : "Wymaga subskrypcji lub konfiguracji")
                     Button("Odśwież bibliotekę i katalog") { Task { await music.refresh() } }.disabled(music.authorization != .authorized)
                     Link("Ustawienia systemowe", destination: URL(string: UIApplication.openSettingsURLString)!)
+                }
+                Section("Odtwarzanie") {
+                    Toggle("Płynne przejścia (Crossfade)", isOn: $crossfade)
+                        .onChange(of: crossfade) { _, _ in player.applyPlaybackPreferences() }
+                    if crossfade {
+                        VStack(alignment: .leading) {
+                            Text("Czas przejścia: \(Int(crossfadeSeconds)) s")
+                            Slider(value: $crossfadeSeconds, in: 1...12, step: 1)
+                                .onChange(of: crossfadeSeconds) { _, _ in player.applyPlaybackPreferences() }
+                        }
+                    }
                 }
                 Section {
                     Toggle("Pobieraj teksty z LRCLIB", isOn: $autoLyrics)

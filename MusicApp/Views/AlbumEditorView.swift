@@ -17,7 +17,6 @@ struct AlbumEditorView: View {
     @State private var draft = AlbumCustomization()
     @State private var section = AlbumEditorSection.square
     @State private var selectedPhoto: PhotosPickerItem?
-    @State private var importing: AlbumEditorSection?
     @State private var showFileImporter = false
     @State private var fileTarget = AlbumEditorSection.square
     @State private var background: Color = .black
@@ -28,13 +27,33 @@ struct AlbumEditorView: View {
 
     var body: some View {
         NavigationStack {
-            Form {
+            editorForm
+            .navigationTitle("Dostosuj album").navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) { Button("Anuluj") { dismiss() } }
+                ToolbarItem(placement: .confirmationAction) { Button("Gotowe") { save() }.fontWeight(.semibold).disabled(importBusy) }
+            }
+            .overlay { if importBusy { ProgressView("Importowanie…").padding(24).background(.regularMaterial, in: RoundedRectangle(cornerRadius: 18)) } }
+            .alert("Nie udało się zapisać", isPresented: Binding(get: { error != nil }, set: { if !$0 { error = nil } })) { Button("OK", role: .cancel) { error = nil } } message: { Text(error ?? "") }
+            .fileImporter(isPresented: $showFileImporter, allowedContentTypes: [.image], onCompletion: importFile)
+            .task { await loadDraft() }
+            .onChange(of: selectedPhoto) { _, item in selectPhoto(item) }
+
+        }.interactiveDismissDisabled(importBusy)
+    }
+    private var editorForm: some View {
+        Form {
                 Section {
                     preview.frame(height: draft.usePortraitArtwork && custom.image(draft.portraitArtwork) != nil ? 340 : 280).listRowInsets(EdgeInsets()).clipped()
                 } header: { Text("Podgląd albumu") }
                 Section {
                     Picker("Dostosuj", selection: $section) { ForEach(AlbumEditorSection.allCases) { Text($0.rawValue).tag($0) } }
                 }
+                selectedSection
+                Section { Text("Wszystkie zmiany wyglądu dotyczą wyłącznie tego albumu w MusicApp.").font(.footnote).foregroundStyle(.secondary) }
+            }
+    }
+    @ViewBuilder private var selectedSection: some View {
                 switch section {
                 case .square: artworkSection(.square, filename: draft.squareArtwork)
                 case .portrait:
@@ -50,17 +69,13 @@ struct AlbumEditorView: View {
                         Button("Wyśrodkuj logo") { draft.logoAlignment = .center; draft.logoOffsetX = 0; draft.logoOffsetY = 0; draft.logoScale = 0.75 }
                     }.disabled(draft.logo == nil)
                 case .colors:
-                    Section("Kolory strony albumu") {
+                    Section {
                         ColorPicker("Kolor tła", selection: $background, supportsOpacity: false).onChange(of: background) { _, color in if loaded { draft.backgroundHex = color.rgbHex } }
                         ColorPicker("Tekst i przyciski", selection: $accent, supportsOpacity: false).onChange(of: accent) { _, color in if loaded { draft.accentHex = color.rgbHex } }
                         Button("Przywróć kolory z okładki") {
-                            draft.backgroundHex = nil; draft.accentHex = nil
-                            loaded = false
-                            background = album.artwork?.backgroundColor.map { Color(cgColor: $0) } ?? .black
-                            accent = album.artwork?.primaryTextColor.map { Color(cgColor: $0) } ?? .white
-                            Task { @MainActor in await Task.yield(); loaded = true }
+                            resetColors()
                         }
-                    } footer: { Text("Wybierz kontrastowe kolory, aby nazwy i przyciski były czytelne.") }
+                    } header: { Text("Kolory strony albumu") } footer: { Text("Wybierz kontrastowe kolory, aby nazwy i przyciski były czytelne.") }
                 case .lyrics:
                     Section {
                         ForEach(tracks) { track in
@@ -68,7 +83,7 @@ struct AlbumEditorView: View {
                                 NavigationLink { LyricsEditorView(song: song) } label: {
                                     VStack(alignment: .leading, spacing: 3) {
                                         Text(song.title)
-                                        Text(custom.lyrics(song.lyricsKey) == nil ? "Dodaj własny tekst" : "Własny tekst zapisany").font(.caption).foregroundStyle(.secondary)
+                                        Text(custom.lyrics(for: song) == nil ? "Dodaj własny tekst" : "Własny tekst zapisany").font(.caption).foregroundStyle(.secondary)
                                     }
                                 }
                             }
@@ -76,43 +91,47 @@ struct AlbumEditorView: View {
                         if tracks.isEmpty { Text("Wczytaj utwory albumu przed edycją tekstów.").foregroundStyle(.secondary) }
                     } header: { Text("Teksty utworów") } footer: { Text("Teksty zapisujesz osobno na ekranie utworu. Mają pierwszeństwo przed LRCLIB i są dostępne wyłącznie w MusicApp.") }
                 }
-                Section { Text("Wszystkie zmiany wyglądu dotyczą wyłącznie tego albumu w MusicApp.").font(.footnote).foregroundStyle(.secondary) }
-            }
-            .navigationTitle("Dostosuj album").navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) { Button("Anuluj") { dismiss() } }
-                ToolbarItem(placement: .confirmationAction) { Button("Gotowe") { save() }.fontWeight(.semibold).disabled(importBusy) }
-            }
-            .overlay { if importBusy { ProgressView("Importowanie…").padding(24).background(.regularMaterial, in: RoundedRectangle(cornerRadius: 18)) } }
-            .alert("Nie udało się zapisać", isPresented: Binding(get: { error != nil }, set: { if !$0 { error = nil } })) { Button("OK", role: .cancel) { error = nil } } message: { Text(error ?? "") }
-            .fileImporter(isPresented: $showFileImporter, allowedContentTypes: [.image]) { result in
-                do {
-                    let url = try result.get()
-                    let access = url.startAccessingSecurityScopedResource()
-                    defer { if access { url.stopAccessingSecurityScopedResource() } }
-                    try importData(Data(contentsOf: url), target: fileTarget)
-                } catch { self.error = error.localizedDescription }
-            }
-            .task {
-                guard !loaded else { return }
-                draft = custom.album(album.id.rawValue); section = initialSection
-                background = draft.backgroundHex.flatMap(Color.init(hex:)) ?? album.artwork?.backgroundColor.map { Color(cgColor: $0) } ?? .black
-                accent = draft.accentHex.flatMap(Color.init(hex:)) ?? album.artwork?.primaryTextColor.map { Color(cgColor: $0) } ?? .white
-                await Task.yield(); loaded = true
-            }
-            .onChange(of: selectedPhoto) { _, item in
-                guard let item else { return }
-                let target = section
-                importBusy = true
-                Task {
-                    defer { importBusy = false; selectedPhoto = nil }
-                    do {
-                        guard let data = try await item.loadTransferable(type: Data.self) else { throw CustomizationStore.StoreError.invalidImage }
-                        try importData(data, target: target)
-                    } catch { self.error = error.localizedDescription }
-                }
-            }
-        }.interactiveDismissDisabled(importBusy)
+    }
+    private var originalBackground: Color {
+        if let cgColor = album.artwork?.backgroundColor { return Color(cgColor: cgColor) }
+        return .black
+    }
+    private var originalAccent: Color {
+        if let cgColor = album.artwork?.primaryTextColor { return Color(cgColor: cgColor) }
+        return .white
+    }
+    private func resetColors() {
+        loaded = false
+        draft.backgroundHex = nil; draft.accentHex = nil
+        background = originalBackground; accent = originalAccent
+        Task { @MainActor in await Task.yield(); loaded = true }
+    }
+    private func loadDraft() async {
+        guard !loaded else { return }
+        draft = custom.album(album.id.rawValue); section = initialSection
+        background = draft.backgroundHex.flatMap { Color(hex: $0) } ?? originalBackground
+        accent = draft.accentHex.flatMap { Color(hex: $0) } ?? originalAccent
+        await Task.yield(); loaded = true
+    }
+    private func importFile(_ result: Result<URL, Error>) {
+        do {
+            let url = try result.get()
+            let access = url.startAccessingSecurityScopedResource()
+            defer { if access { url.stopAccessingSecurityScopedResource() } }
+            try importData(Data(contentsOf: url), target: fileTarget)
+        } catch { self.error = error.localizedDescription }
+    }
+    private func selectPhoto(_ item: PhotosPickerItem?) {
+        guard let item else { return }
+        let target = section
+        importBusy = true
+        Task {
+            defer { importBusy = false; selectedPhoto = nil }
+            do {
+                guard let data = try await item.loadTransferable(type: Data.self) else { throw CustomizationStore.StoreError.invalidImage }
+                try importData(data, target: target)
+            } catch { self.error = error.localizedDescription }
+        }
     }
     @ViewBuilder private func artworkSection(_ target: AlbumEditorSection, filename: String?) -> some View {
         Section {

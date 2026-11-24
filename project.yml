@@ -1,0 +1,53 @@
+name: MusicApp
+options:
+  bundleIdPrefix: pl.barury
+  deploymentTarget:
+    iOS: '26.0'
+settings:
+  base:
+    SWIFT_VERSION: '5.0'
+    TARGETED_DEVICE_FAMILY: '1,2'
+    MARKETING_VERSION: '0.1.0'
+    CURRENT_PROJECT_VERSION: '1'
+    CODE_SIGNING_ALLOWED: NO
+    ENABLE_USER_SCRIPT_SANDBOXING: YES
+    ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+    GENERATE_INFOPLIST_FILE: NO
+    INFOPLIST_FILE: MusicApp/Resources/Info.plist
+    PRODUCT_BUNDLE_IDENTIFIER: pl.barury.MusicApp
+    DEVELOPMENT_TEAM: ''
+targets:
+  MusicApp:
+    type: application
+    platform: iOS
+    sources:
+      - path: MusicApp
+        excludes: [Resources/Info.plist]
+    dependencies:
+      - sdk: MusicKit.framework
+      - sdk: MediaPlayer.framework
+      - sdk: PhotosUI.framework
+      - sdk: Security.framework
+    settings:
+      base:
+        SUPPORTS_MACCATALYST: NO
+        SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD: NO
+  MusicAppTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources: [Tests]
+    dependencies:
+      - target: MusicApp
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+        INFOPLIST_FILE: ''
+        PRODUCT_BUNDLE_IDENTIFIER: pl.barury.MusicAppTests
+schemes:
+  MusicApp:
+    build:
+      targets:
+        MusicApp: all
+        MusicAppTests: [test]
+    test:
+      targets: [MusicAppTests]

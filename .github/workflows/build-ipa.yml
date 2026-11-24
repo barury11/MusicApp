@@ -1,0 +1,62 @@
+name: Build unsigned IPA
+on:
+  push:
+    branches: [main, 'codex/**']
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: musicapp-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  build:
+    runs-on: macos-15
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - name: Select newest installed Xcode
+        run: |
+          python3 scripts/select_xcode.py
+          xcodebuild -version
+          xcrun --sdk iphoneos --show-sdk-version
+      - name: Generate Xcode project
+        run: |
+          brew install xcodegen
+          xcodegen generate
+      - name: Build for iPhone and iPad without signing
+        run: |
+          set -o pipefail
+          xcodebuild -project MusicApp.xcodeproj -scheme MusicApp \
+            -configuration Release -sdk iphoneos -destination 'generic/platform=iOS' \
+            -derivedDataPath build/device \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY='' build 2>&1 | tee build/device-build.log
+      - name: Package and validate IPA
+        run: python3 scripts/package_ipa.py build/device/Build/Products/Release-iphoneos/MusicApp.app build/MusicApp-unsigned.ipa
+      - name: Upload unsigned IPA
+        uses: actions/upload-artifact@v4
+        with:
+          name: MusicApp-unsigned
+          path: build/MusicApp-unsigned.ipa
+          if-no-files-found: error
+          retention-days: 30
+      - name: Choose available simulator
+        run: python3 scripts/select_simulator.py
+      - name: Run unit tests on iOS Simulator
+        run: |
+          set -o pipefail
+          xcodebuild -project MusicApp.xcodeproj -scheme MusicApp \
+            -configuration Debug -destination "platform=iOS Simulator,id=$MUSICAPP_SIMULATOR_ID" \
+            -derivedDataPath build/simulator -resultBundlePath build/Tests.xcresult \
+            CODE_SIGNING_ALLOWED=NO test 2>&1 | tee build/tests.log
+      - name: Upload diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: MusicApp-diagnostics
+          path: |
+            build/*.log
+            build/Tests.xcresult
+          if-no-files-found: ignore
+          retention-days: 7
